@@ -1,0 +1,222 @@
+import csv
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+import requests
+
+
+# Étape 1
+def list_ocurrence(text):
+    list_mots = text.split()
+
+    occurences = {}
+
+    for mot in list_mots:
+        mot = mot.lower()
+        occurences[mot] = occurences.get(mot, 0) + 1
+    occurences_dict = dict(sorted(occurences.items(), key=lambda item: item[1], reverse=True))
+
+    return occurences_dict
+
+
+# Étape 2
+def supp_mots_parasites(occurences, mots_parasites):
+    occurences_copy = occurences.copy()
+
+    for mot_parasite in mots_parasites:
+        mot_parasite = mot_parasite.lower()
+
+        if mot_parasite in occurences_copy:
+            del occurences_copy[mot_parasite]
+
+    return occurences_copy
+
+
+# Étape 3
+def lire_mots_parasites(fichier_csv):
+    mots_parasites = []
+    try:
+        with open(fichier_csv, 'r', newline='', encoding='utf-8') as fichier:
+            lecteur_csv = csv.DictReader(fichier)
+            for ligne in lecteur_csv:
+                mot_parasite = ligne.get('mot_parasite', '').strip()
+                if mot_parasite:
+                    mots_parasites.append(mot_parasite)
+
+    except FileNotFoundError:
+        print(f"Le fichier {fichier_csv} n'a pas été trouvé.")
+    except Exception as e:
+        print(f"Une erreur s'est produite lors de la lecture du fichier CSV : {str(e)}")
+
+    return mots_parasites
+
+
+# Étape 4
+
+txt = "Bonsoir voici mon exo tchouss"
+
+resultat_occurence = list_ocurrence(txt)
+
+fichier_csv = "parasite.csv"
+mots_parasites = lire_mots_parasites(fichier_csv)
+
+occurence_nettoyer = supp_mots_parasites(resultat_occurence, mots_parasites)
+
+mots_cles = sorted(occurence_nettoyer.items(), key=lambda item: item[1], reverse=True)[:10]
+print("Mots-clés les plus importants :")
+for mot, occurrence in mots_cles:
+    print(f"{mot}: {occurrence}")
+
+
+# Étape 5
+def supp_balises_html(html_texte):
+    try:
+        soup = BeautifulSoup(html_texte, 'html.parser')
+        texte_sans_balise = soup.get_text()
+        return texte_sans_balise
+
+    except Exception as e:
+        return str(e)
+
+
+html_texte = "<p>Ceci est <strong>un exemple</strong> avec beaucoup de mot , la meilleure phrase de  <a href='#'>tout les temps</a>.</p>"
+print("Etape 5")
+texte_sans_balise = supp_balises_html(html_texte)
+print(texte_sans_balise)
+
+
+# Étape 6
+def extr_valeurs_html(chaine_html, nom_balise, nom_attribut):
+    try:
+        soup = BeautifulSoup(chaine_html, 'html.parser')
+
+        balises = soup.find_all(nom_balise)
+
+        valeurs = [balise.get(nom_attribut) for balise in balises]
+
+        return valeurs
+
+    except Exception as e:
+        return str(e)
+
+
+# Étape 7
+
+chaine_html_images = '''
+<html>
+    <img src="image1.jpg" alt="Image 1">
+    <img src="image2.jpg" alt="Image 2">
+    <img src="image3.jpg" alt="Image 3">
+</html>
+'''
+
+valeurs_alt_images = extr_valeurs_html(chaine_html_images, 'img', 'alt')
+print("Etape 7 : Valeurs des attributs 'alt' des balises <img> :")
+print(valeurs_alt_images)
+
+chaine_html_liens = '''
+<html>
+    <a href="lien1">Lien 1</a>
+    <a href="lien2">Lien 2</a>
+    <a href="lien3">Lien 3</a>
+</html>
+'''
+
+valeurs_href_liens = extr_valeurs_html(chaine_html_liens, 'a', 'href')
+print(" Etape 7 : Valeurs des attributs 'href' des balises <a> :")
+print(valeurs_href_liens)
+
+
+# Étape 8
+def extr_nom_de_domaine(url):
+    try:
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+        return domain
+
+    except Exception as e:
+        return str(e)
+
+
+# Étape 9
+def filtre_urls_par_domaine(nom_domaine, liste_urls):
+    urls_du_domaine = []
+    urls_hors_domaine = []
+
+    for url in liste_urls:
+        if nom_domaine in url:
+            urls_du_domaine.append(url)
+        else:
+            urls_hors_domaine.append(url)
+
+    return urls_du_domaine, urls_hors_domaine
+
+
+# Étape 10
+def recup_texte_html_depuis_url(url_recup):
+    try:
+        response = requests.get(url_recup)
+        if response.status_code == 200:
+            texte_html = response.text
+            return texte_html
+        else:
+            return f"Échec de la requête HTTP avec le code d'état {response.status_code}"
+    except Exception as e:
+        return str(e)
+
+
+# Étape 11
+def audit_page_url(url):
+    try:
+        html_text = recup_texte_html_depuis_url(url)
+
+        html_text_sans_balise = supp_balises_html(html_text)
+
+        occurences = list_ocurrence(html_text_sans_balise)
+
+        fichier_csv = "parasite.csv"
+        mots_parasites = lire_mots_parasites(fichier_csv)
+
+        occurences_nettoyer = supp_mots_parasites(occurences, mots_parasites)
+
+        mots_cles = sorted(occurences_nettoyer.items(), key=lambda item: item[1], reverse=True)[:3]
+
+        valeurs_alt_images = extr_valeurs_html(html_text, 'img', 'alt')
+
+        soup = BeautifulSoup(html_text, 'html.parser')
+        liens_entrants = len(soup.find_all('a'))
+
+        liens_sortants = len(soup.find_all('a', href=True))
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("Résultats de l'audit pour l'URL :", url)
+        print("-------------------------------------------------------")
+        print("Mots-clés les plus importants :")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        for mot, occurrence in mots_cles:
+            print(f"{mot}: {occurrence}")
+            print("/////////////////////////////////////////")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("Nombre de liens entrants :", liens_entrants)
+        print("-------------------------------------------------------")
+        print("Nombre de liens sortants :", liens_sortants)
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        if valeurs_alt_images:
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("Présence de balises alt sur les images.")
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        else:
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("Aucune balise alt trouvée sur les images.")
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+    except Exception as e:
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print(f"Une erreur s'est produite lors de l'audit de l'URL : {str(e)}")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+
+if __name__ == "__main__":
+    print("Etape 11 : audit du page web")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    url = input("Veuillez entrer l'URL de la page à analyser : ")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    audit_page_url(url)
